@@ -235,15 +235,6 @@ sub download_urls {
 }
 
 ######################################################################################
-## Create the 3 needed directories if they don't exist yet
-my @needed_directories = (get_variable("mirror_path"), get_variable("skel_path"), get_variable("var_path"));
-foreach my $needed_directory (@needed_directories) {
-    unless (-d $needed_directory) {
-        mkdir($needed_directory) or die("apt-mirror: can't create $needed_directory directory");
-    }
-}
-
-######################################################################################
 ## Parse config
 
 open CONFIG, "<$config_file" or die("apt-mirror: can't open config file ($config_file)");
@@ -294,6 +285,15 @@ while(<CONFIG>) {
 close CONFIG;
 
 die("Please explicitly specify 'defaultarch' in mirror.list") unless get_variable("defaultarch");
+
+######################################################################################
+## Create the 3 needed directories if they don't exist yet
+my @needed_directories = (get_variable("mirror_path"), get_variable("skel_path"), get_variable("var_path"));
+foreach my $needed_directory (@needed_directories) {
+    unless (-d $needed_directory) {
+        mkdir($needed_directory) or die("apt-mirror: can't create $needed_directory directory");
+    }
+}
 
 check_lock();
 
@@ -629,8 +629,8 @@ if(get_variable("_autoclean")) {
     print CLEAN "echo 'Removing $total unnecessary files [$unnecessary_bytes bytes]...'\n";
     foreach (@rm_files) {
 	print CLEAN "rm -f '$_'\n";
-	print CLEAN "echo -n '[" . int(100 * $i/$total) . "\%]'\n" unless $i % 500;
-	print CLEAN "echo -n .\n" unless $i % 10;
+	print CLEAN "echo '[" . int(100 * $i/$total) . "\%]''\c'\n" unless $i % 500;
+	print CLEAN "echo '.''\c'\n" unless $i % 10;
         $i ++;
     }
     print CLEAN "echo 'done.'\n";
@@ -640,8 +640,8 @@ if(get_variable("_autoclean")) {
     print CLEAN "echo 'Removing $total unnecessary directories...'\n";
     foreach (@rm_dirs) {
 	print CLEAN "rmdir '$_'\n";
-        print CLEAN "echo -n '[" . int(100 * $i/$total) . "\%]'\n" unless $i % 50;
-        print CLEAN "echo -n .\n";
+        print CLEAN "echo '[" . int(100 * $i/$total) . "\%]''\c'\n" unless $i % 50;
+        print CLEAN "echo '.''\c'\n";
         $i ++;
     }
     print CLEAN "echo 'done.'\n";
