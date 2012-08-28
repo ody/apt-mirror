@@ -94,6 +94,7 @@ my %config_variables = (
     "nthreads"    => 20,
     "base_path"   => '/var/spool/apt-mirror',
     "mirror_path" => '$base_path/mirror',
+    "mirror_list_path"   => '/etc/apt-mirror/mirror.list.d',
     "skel_path"   => '$base_path/skel',
     "var_path"    => '$base_path/var',
     "cleanscript" => '$var_path/clean.sh',
@@ -292,6 +293,18 @@ sub open_config_file {
 
 open_config_file("$config_file");
 
+my $file_basepath = get_variable("mirror_list_path");
+opendir (DIR, $file_basepath) or die "apt-mirror: can't open directory ($file_basepath)";
+while (my $file = readdir(DIR)) {
+    # Use a regular expression to ignore files beginning with a period
+    next if ($file =~ m/^\./);
+    # Ignore all files not ending with .list
+    next if !($file =~ m/.*\.list$/);
+    
+    open_config_file("$file_basepath/$file");
+}
+closedir(DIR);
+
 die("Please explicitly specify 'defaultarch' in mirror.list") unless get_variable("defaultarch");
 
 ######################################################################################
@@ -310,7 +323,6 @@ $SIG{HUP} = "unlock_aptmirror";
 $SIG{TERM} = "unlock_aptmirror";
 
 lock_aptmirror();
-
 
 ######################################################################################
 ## Skel download
