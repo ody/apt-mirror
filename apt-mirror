@@ -94,6 +94,7 @@ my %config_variables = (
     "nthreads"    => 20,
     "base_path"   => '/var/spool/apt-mirror',
     "mirror_path" => '$base_path/mirror',
+    "mirror_list_path"   => '/etc/apt-mirror/mirror.list.d',
     "skel_path"   => '$base_path/skel',
     "var_path"    => '$base_path/var',
     "cleanscript" => '$var_path/clean.sh',
@@ -237,31 +238,30 @@ sub download_urls {
 ######################################################################################
 ## Parse config
 
-open CONFIG, "<$config_file" or die("apt-mirror: can't open config file ($config_file)");
-while(<CONFIG>) {
-    next if /^\s*#/;
-    next unless /\S/;
+sub parse_config_file {
+    return if /^\s*#/;
+    return unless /\S/;
     my @config_line = split;
     my $config_line = shift @config_line;
 
     if($config_line eq "set") {
 	$config_variables{$config_line[0]} = $config_line[1];
-	next;
+	return;
     }
-    
+
     if($config_line eq "deb") {
 	push @config_binaries, [get_variable("defaultarch"), @config_line];
-	next;
+	return;
     }
 
     if($config_line =~ /deb-(alpha|amd64|armel|arm|hppa|hurd-i386|i386|ia64|lpia|m68k|mipsel|mips|powerpc|s390|sh|sparc)/) {
 	push @config_binaries, [$1, @config_line];
-	next;
+	return;
     }
 
     if($config_line eq "deb-src") {
 	push @config_sources, [@config_line];
-	next;
+	return;
     }
 
     if($config_line eq "skip-clean") {
@@ -269,7 +269,7 @@ while(<CONFIG>) {
 	$config_line[0] =~ s[/$][];
 	$config_line[0] =~ s[~][%7E]g if get_variable("_tilde");
 	$skipclean{$config_line[0]} = 1;
-	next;
+	return;
     }
 
     if($config_line eq "clean") {
@@ -277,12 +277,33 @@ while(<CONFIG>) {
 	$config_line[0] =~ s[/$][];
 	$config_line[0] =~ s[~][%7E]g if get_variable("_tilde");
 	$clean_directory{$config_line[0]} = 1;
-	next;
+	return;
     }
     
     die("apt-mirror: invalid line in config file ($.: $config_line ...)");
 }
-close CONFIG;
+
+sub open_config_file {
+    open CONFIG, "@_" or die("apt-mirror: can't open config file (@_)");
+    while(<CONFIG>) {
+        parse_config_file(@_);
+    }
+    close CONFIG;
+}
+
+open_config_file("$config_file");
+
+my $file_basepath = get_variable("mirror_list_path");
+opendir (DIR, $file_basepath) or die "apt-mirror: can't open directory ($file_basepath)";
+while (my $file = readdir(DIR)) {
+    # Use a regular expression to ignore files beginning with a period
+    next if ($file =~ m/^\./);
+    # Ignore all files not ending with .list
+    next if !($file =~ m/.*\.list$/);
+    
+    open_config_file("$file_basepath/$file");
+}
+closedir(DIR);
 
 die("Please explicitly specify 'defaultarch' in mirror.list") unless get_variable("defaultarch");
 
@@ -302,7 +323,6 @@ $SIG{HUP} = "unlock_aptmirror";
 $SIG{TERM} = "unlock_aptmirror";
 
 lock_aptmirror();
-
 
 ######################################################################################
 ## Skel download
